@@ -1,0 +1,57 @@
+// A small allocation budget for this test, not the Jetson's physical RAM size.
+// HBM is Vx's logical GPU allocation domain; Orin uses shared physical DRAM.
+Memory HBM {
+  capacity: 64 MiB, managed: explicit, scope: device
+}
+
+Topology Device {
+  arch: nvptx64,
+  chip: sm_87,
+  levels: [blocks(max_lanes: 1024, memory: cta), subgroups(lanes: 32), lanes(memory: thread)],
+  memory: Memory::HBM,
+  visible: [Memory::HBM],
+  transfer Memory::CPU_DRAM -> Memory::HBM,
+  transfer Memory::HBM -> Memory::CPU_DRAM
+}
+
+// GPU kernel: one block, four threads, one addition per thread.
+pub fn add(
+  result: &mut Tensor<f32, [1, 4], Memory::HBM>,
+  a: &Tensor<f32, [1, 4], Memory::HBM>,
+  b: &Tensor<f32, [1, 4], Memory::HBM>
+) -> void {
+  spawn on(Topology::Device) {
+    for block in 0..1 across blocks {
+      for lane in 0..4 across lanes {
+        result[block][lane] = a[block][lane] + b[block][lane];
+      }
+    }
+  }
+  return;
+}
+
+fn main() -> i32 {
+  // CPU: prepare two inputs and storage for the answer.
+  let mut a = Tensor<f32, [1, 4]>::fill(0.0);
+  let mut b = Tensor<f32, [1, 4]>::fill(0.0);
+  let result = Tensor<f32, [1, 4]>::fill(0.0);
+  a[0][0] = 1.0; a[0][1] = 2.0; a[0][2] = 3.0; a[0][3] = 4.0;
+  b[0][0] = 10.0; b[0][1] = 20.0; b[0][2] = 30.0; b[0][3] = 40.0;
+
+  // Vx's runtime allocates GPU buffers and copies the data.
+  let a_gpu = transfer(a, Memory::HBM);
+  let b_gpu = transfer(b, Memory::HBM);
+  let mut result_gpu = transfer(result, Memory::HBM);
+
+  add(&mut result_gpu, &a_gpu, &b_gpu);
+
+  // Bring the answer back, checking every element on the CPU.
+  let answer = transfer(result_gpu, Memory::CPU_DRAM);
+  assert(answer[0][0] == 11.0, "lane 0");
+  assert(answer[0][1] == 22.0, "lane 1");
+  assert(answer[0][2] == 33.0, "lane 2");
+  assert(answer[0][3] == 44.0, "lane 3");
+  println!("Hello GPU: {} {} {} {}", answer[0][0], answer[0][1], answer[0][2], answer[0][3]);
+  println!("PASS: all four additions match.");
+  return 0;
+}
