@@ -1,0 +1,73 @@
+// A small allocation budget for this test, not the Jetson's physical RAM size.
+// HBM is Vx's logical GPU allocation domain; Orin uses shared physical DRAM.
+Memory HBM {
+  capacity: 128 MiB, managed: explicit, scope: device
+}
+
+Topology Device {
+  arch: nvptx64,
+  chip: sm_87,
+  levels: [blocks(max_lanes: 1024, memory: cta), subgroups(lanes: 32), lanes(memory: thread)],
+  memory: Memory::HBM,
+  visible: [Memory::HBM],
+  transfer Memory::CPU_DRAM -> Memory::HBM,
+  transfer Memory::HBM -> Memory::CPU_DRAM
+}
+
+
+import std::time;
+extern { fn cudaDeviceSynchronize() -> i32; }
+pub fn add(result: &mut Tensor<f32, [256, 256], Memory::HBM>,
+           a: &Tensor<f32, [256, 256], Memory::HBM>,
+           b: &Tensor<f32, [256, 256], Memory::HBM>) -> void {
+  spawn on(Topology::Device) {
+    for block in 0..256 across blocks {
+      for lane in 0..256 across lanes {
+        result[block][lane] = a[block][lane] + b[block][lane];
+      }
+    }
+  }
+  return;
+}
+fn sync() -> void {
+  let rc = unsafe { cudaDeviceSynchronize() };
+  assert(rc == 0, "CUDA synchronization failed");
+  return;
+}
+fn main() -> i32 {
+  let mut a = Tensor<f32, [256, 256]>::fill(0.0);
+  let mut b = Tensor<f32, [256, 256]>::fill(0.0);
+  let result = Tensor<f32, [256, 256]>::fill(0.0);
+  for row in 0..256 {
+    for lane in 0..256 {
+      let i = row * 256 + lane;
+      a[row][lane] = (i % 97) as f32;
+      b[row][lane] = (i % 31) as f32;
+    }
+  }
+  sync();
+  let upload = now();
+  let ag = transfer(a, Memory::HBM);
+  let bg = transfer(b, Memory::HBM);
+  let mut cg = transfer(result, Memory::HBM);
+  sync();
+  unsafe { bench_report("upload_ms", "ms", (now()-upload)*1000.0); }
+  for sample in 0..2000 { add(&mut cg, &ag, &bg); sync(); }
+  let start = now();
+  for sample in 0..501 { add(&mut cg, &ag, &bg); sync(); }
+  let elapsed = now()-start;
+  unsafe { bench_report("host_us", "us", elapsed*1000000.0/501.0); }
+  let download = now();
+  let answer = transfer(cg, Memory::CPU_DRAM);
+  sync();
+  unsafe { bench_report("download_ms", "ms", (now()-download)*1000.0); }
+  for row in 0..256 {
+    for lane in 0..256 {
+      let i = row * 256 + lane;
+      let expected = ((i % 97) as f32) + ((i % 31) as f32);
+      assert(answer[row][lane] == expected, "wrong sum");
+    }
+  }
+  println!("PASS");
+  return 0;
+}
