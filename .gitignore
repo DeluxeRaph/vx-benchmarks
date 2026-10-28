@@ -4,6 +4,6 @@ __pycache__/
 .DS_Store
 *.o
 *.log
-benchmark/cuda_bench
-benchmark/vx_[0-9]*
-!benchmark/vx_*.vx
+benchmarks/*/cuda_bench
+benchmarks/*/vx_[0-9]*
+!benchmarks/*/vx_*.vx
