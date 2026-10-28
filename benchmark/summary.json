@@ -1,0 +1,66 @@
+[
+  {
+    "n": 4,
+    "lang": "vx",
+    "kernel_us": 17.0,
+    "host_us": 49.57695,
+    "upload_ms": 0.97167397,
+    "download_ms": 0.32854825
+  },
+  {
+    "n": 4,
+    "lang": "cuda",
+    "kernel_us": 14.656,
+    "host_us": 38.884461078,
+    "upload_ms": 0.967929,
+    "download_ms": 0.152484
+  },
+  {
+    "n": 1024,
+    "lang": "vx",
+    "kernel_us": 18.0,
+    "host_us": 53.436634,
+    "upload_ms": 0.99509805,
+    "download_ms": 0.30614436
+  },
+  {
+    "n": 1024,
+    "lang": "cuda",
+    "kernel_us": 16.128,
+    "host_us": 41.038928144,
+    "upload_ms": 1.010715,
+    "download_ms": 0.118467
+  },
+  {
+    "n": 65536,
+    "lang": "vx",
+    "kernel_us": 31.0,
+    "host_us": 72.28312,
+    "upload_ms": 2.493377,
+    "download_ms": 0.89772046
+  },
+  {
+    "n": 65536,
+    "lang": "cuda",
+    "kernel_us": 26.624,
+    "host_us": 68.032429142,
+    "upload_ms": 2.327389,
+    "download_ms": 0.727347
+  },
+  {
+    "n": 1048576,
+    "lang": "vx",
+    "kernel_us": 226.0,
+    "host_us": 289.18558,
+    "upload_ms": 7.169179,
+    "download_ms": 5.13947
+  },
+  {
+    "n": 1048576,
+    "lang": "cuda",
+    "kernel_us": 217.056006,
+    "host_us": 250.250734531,
+    "upload_ms": 5.853816,
+    "download_ms": 4.934241
+  }
+]
